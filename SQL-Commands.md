@@ -678,6 +678,32 @@ The `ALTER TABLE` command is used to add, delete, or modify columns in an existi
         ALTER TABLE <table_name> MODIFY COLUMN <column_name> <column_definition> AFTER <other_column_name>;
         ```
 
+### `CHANGE` and `MODIFY` (MySQL Specific)
+
+In MySQL, `ALTER TABLE` provides `CHANGE COLUMN` and `MODIFY COLUMN` clauses to alter existing columns. While both can change a column's definition, `CHANGE COLUMN` is also used to rename a column.
+
+*   **`MODIFY COLUMN`:** Used to change the definition of an existing column (e.g., data type, constraints) without renaming it.
+
+    **Example: Change data type and add NOT NULL constraint**
+    ```sql
+    ALTER TABLE products
+    MODIFY COLUMN product_name VARCHAR(200) NOT NULL;
+    ```
+
+*   **`CHANGE COLUMN`:** Used to change the definition of an existing column and/or rename it. When renaming, you must specify both the old and new column names, along with the new column definition.
+
+    **Example: Rename a column and change its data type**
+    ```sql
+    ALTER TABLE customers
+    CHANGE COLUMN old_email_address new_email VARCHAR(255);
+    ```
+
+    **Example: Change data type without renaming (similar to MODIFY)**
+    ```sql
+    ALTER TABLE orders
+    CHANGE COLUMN order_date order_date DATE NOT NULL;
+    ```
+
 ## SELECT Queries
 
 The `SELECT` statement is used to query the database and retrieve data that matches criteria that you specify.
@@ -754,6 +780,16 @@ The `SELECT` statement is used to query the database and retrieve data that matc
     SELECT * FROM <table_name> LIMIT <number>;
     ```
 
+*   **Skip results with `OFFSET`:**
+    The `OFFSET` clause is used with `LIMIT` to skip a specified number of rows before beginning to return rows. This is commonly used for pagination.
+
+    *Example: Get the second page of 5 students (skipping the first 5).*
+    ```sql
+    SELECT * FROM students
+    ORDER BY student_id
+    LIMIT 5 OFFSET 5;
+    ```
+
 *   **Select unique values with `DISTINCT`:**
     ```sql
     SELECT DISTINCT <column_name> FROM <table_name>;
@@ -774,6 +810,85 @@ The `SELECT` statement is used to query the database and retrieve data that matc
     FROM orders AS o, customers AS c
     WHERE o.customer_id = c.customer_id;
     ```
+
+*   **Filter with `LIKE` and Wildcards:**
+    The `LIKE` operator is used in a `WHERE` clause to search for a specified pattern in a column. SQL wildcards are used to substitute for one or more characters in a string.
+
+    *   **`%` (Percent sign):** Represents zero, one, or multiple characters.
+        *Example: Find all customers whose names start with 'A'.*
+        ```sql
+        SELECT * FROM customers WHERE customer_name LIKE 'A%';
+        ```
+        *Example: Find all customers whose names contain 'an'.*
+        ```sql
+        SELECT * FROM customers WHERE customer_name LIKE '%an%';
+        ```
+        *Example: Find all customers whose names end with 'a'.*
+        ```sql
+        SELECT * FROM customers WHERE customer_name LIKE '%a';
+        ```
+
+    *   **`_` (Underscore):** Represents a single character.
+        *Example: Find all customers whose names have 'a' as the second letter.*
+        ```sql
+        SELECT * FROM customers WHERE customer_name LIKE '_a%';
+        ```
+        *Example: Find all customers whose names start with 'B' and are 4 letters long.*
+        ```sql
+        SELECT * FROM customers WHERE customer_name LIKE 'B___';
+        ```
+
+*   **Group rows with `GROUP BY`:**
+    The `GROUP BY` statement groups rows that have the same values in specified columns into summary rows. It is often used with aggregate functions (`COUNT`, `MAX`, `MIN`, `SUM`, `AVG`) to perform calculations on each group.
+
+    *Example: Count the number of students in each course.*
+    ```sql
+    SELECT course_id, COUNT(student_id) AS number_of_students
+    FROM enrollments
+    GROUP BY course_id;
+    ```
+
+*   **Combining `WHERE` and `GROUP BY`:**
+    The `WHERE` clause is used to filter individual rows *before* they are grouped, while `HAVING` filters groups *after* they have been formed.
+
+    *Example: Count the number of students in each course, but only for enrollments made after a specific date.*
+    ```sql
+    SELECT course_id, COUNT(student_id) AS number_of_students
+    FROM enrollments
+    WHERE enrollment_date > '2023-01-01'
+    GROUP BY course_id;
+    ```
+
+*   **Filter groups with `HAVING`:**
+    The `HAVING` clause was added to SQL because the `WHERE` keyword could not be used with aggregate functions. `HAVING` enables you to filter groups based on the results of aggregate functions.
+
+    *Example: Find courses that have more than 5 students.*
+    ```sql
+    SELECT course_id, COUNT(student_id) AS number_of_students
+    FROM enrollments
+    GROUP BY course_id
+    HAVING COUNT(student_id) > 5;
+    ```
+
+*   **Summarize data with `ROLLUP`:**
+    The `ROLLUP` extension to `GROUP BY` is used to generate subtotals and grand totals for a set of columns. It creates a hierarchy of groupings, from the most detailed level to a grand total.
+
+    *Example: Get the count of students per course, and also the total count of all students.*
+    ```sql
+    SELECT course_id, COUNT(student_id) AS number_of_students
+    FROM enrollments
+    GROUP BY ROLLUP(course_id);
+    ```
+    *This will show the student count for each `course_id`, and a final row where `course_id` is `NULL` which represents the grand total of all students across all courses.*
+
+    *   **MySQL `ROLLUP` Syntax:**
+        In MySQL, `ROLLUP` is used directly within the `GROUP BY` clause, similar to the standard SQL syntax.
+        ```sql
+        SELECT course_id, COUNT(student_id) AS number_of_students
+        FROM enrollments
+        GROUP BY course_id WITH ROLLUP;
+        ```
+        *Note: The `WITH ROLLUP` modifier is appended to the `GROUP BY` clause in MySQL.*
 
 ## UPDATE Queries
 
