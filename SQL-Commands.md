@@ -790,6 +790,24 @@ The `SELECT` statement is used to query the database and retrieve data that matc
     LIMIT 5 OFFSET 5;
     ```
 
+*   **Limit results with `FETCH FIRST` / `OFFSET ... FETCH NEXT` (SQL Standard):**
+    This syntax is part of the SQL Standard (SQL:2008 and later) and is supported by databases like Oracle, DB2, and increasingly PostgreSQL (as an alternative to `LIMIT`). It provides a standard way to limit results and perform pagination.
+
+    *Example: Get the first 10 students.*
+    ```sql
+    SELECT * FROM students
+    ORDER BY student_id
+    FETCH FIRST 10 ROWS ONLY;
+    ```
+
+    *Example: Get the second page of 5 students (skipping the first 5).*
+    ```sql
+    SELECT * FROM students
+    ORDER BY student_id
+    OFFSET 5 ROWS
+    FETCH NEXT 5 ROWS ONLY;
+    ```
+
 *   **Select unique values with `DISTINCT`:**
     ```sql
     SELECT DISTINCT <column_name> FROM <table_name>;

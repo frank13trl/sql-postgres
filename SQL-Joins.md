@@ -1,4 +1,4 @@
-# SQL Joins, Views, Indexes, Subqueries
+# SQL Joins
 
 ## SQL Joins
 SQL Joins are used to combine rows from two or more tables, based on a related column between them. They are a fundamental part of relational database management, allowing you to retrieve data that is spread across multiple tables. There are several types of joins, each serving a specific purpose in combining data from related tables.
@@ -211,13 +211,17 @@ LEFT JOIN
 **Note on Foreign Keys and SELF JOINs:**
 While a `SELF JOIN` operates on a single table, the concept of a foreign key is still crucial. Often, a `SELF JOIN` is used when a table contains a **self-referencing foreign key**. This is a column (like `manager_id` in our example) that refers to the primary key (`employee_id`) within the *same* table. This mechanism establishes relationships (e.g., hierarchical structures) within the data of a single table, which the `SELF JOIN` then leverages.
 
+## Set Operators
+
+Set operators are used to combine the result sets of two or more `SELECT` statements. For all set operators, the `SELECT` statements must have the same number of columns, and the columns must have compatible data types.
+
 ## UNION
 
-`UNION` is a set operator, not a join. It combines the result sets of two or more `SELECT` statements into a single result set. Both `SELECT` statements must have the same number of columns, and the columns must have compatible data types. By default, `UNION` removes duplicate rows.
+The `UNION` operator combines the result sets and **removes duplicate rows**.
 
 **Example (PostgreSQL):**
 
-Let's say we have two tables, `employees` and `contractors`, and we want a combined list of all names.
+Let's say we have two tables, `employees` and `contractors`, and we want a combined list of all unique names.
 
 `employees` table:
 | id | name    |
@@ -247,23 +251,11 @@ SELECT name FROM contractors;
 
 ## UNION ALL
 
-`UNION ALL` is also a set operator that combines the result sets of two or more `SELECT` statements. Unlike `UNION`, `UNION ALL` includes all rows from both result sets, **without removing duplicate rows**. This makes `UNION ALL` generally faster than `UNION` when duplicate removal is not necessary.
+The `UNION ALL` operator combines the result sets but **includes all duplicate rows**. This makes `UNION ALL` generally faster than `UNION` because it doesn't need to check for duplicates.
 
 **Example (PostgreSQL):**
 
 Using the same `employees` and `contractors` tables:
-
-`employees` table:
-| id | name    |
-|----|---------|
-| 1  | Alice   |
-| 2  | Bob     |
-
-`contractors` table:
-| id | name      |
-|----|-----------|
-| 10 | Charlie   |
-| 11 | Alice     |
 
 ```sql
 SELECT name FROM employees
@@ -280,7 +272,135 @@ SELECT name FROM contractors;
 | Charlie |
 | Alice   |
 
-## SQL Views
+## INTERSECT
+
+The `INTERSECT` operator returns only the rows that are present in **both** result sets.
+
+**Example (PostgreSQL):**
+
+Using the same `employees` and `contractors` tables, let's find the names that appear in both tables.
+
+```sql
+SELECT name FROM employees
+INTERSECT
+SELECT name FROM contractors;
+```
+
+**Result:**
+
+| name    |
+|---------|
+| Alice   |
+
+## EXCEPT
+
+The `EXCEPT` operator returns all rows that are present in the **first** result set but **not** in the second result set.
+
+*(Note: Some databases, like Oracle, use the keyword `MINUS` instead of `EXCEPT`.)*
+
+**Example (PostgreSQL):**
+
+Using the same `employees` and `contractors` tables, let's find the names that are in the `employees` table but not in the `contractors` table.
+
+```sql
+SELECT name FROM employees
+EXCEPT
+SELECT name FROM contractors;
+```
+
+**Result:**
+
+| name    |
+|---------|
+| Bob     |
+
+### INTERSECT vs. INNER JOIN: Key Differences
+
+While both `INTERSECT` and `INNER JOIN` can be used to find matching data, they operate in fundamentally different ways and serve different purposes.
+
+| Feature | `INTERSECT` (Set Operator) | `INNER JOIN` (Join Operator) |
+| :--- | :--- | :--- |
+| **Purpose** | Compares the **entire rows** of two result sets and returns only the rows that are identical in both. | Combines rows from two tables into a **single new row** based on a matching condition in one or more columns. |
+| **Result Columns** | The number and names of columns are determined by the **first `SELECT` statement**. | The result can include columns from **both tables**. The structure is a new, wider row. |
+| **Duplicate Handling** | **Removes duplicate rows** from the final result set. It returns only unique rows that are common to both queries. | **Does not remove duplicates**. If there are multiple matches on the join condition, it returns the Cartesian product of those matching rows. |
+| **Column Requirements** | The `SELECT` statements must have the **same number of columns** with compatible data types. | The columns in the join condition must have compatible data types, but the tables can have a different number and type of other columns. |
+| **`NULL` Handling** | Treats `NULL` values as **equal**. A row with a `NULL` can be matched with another row with a `NULL` in the same position. | Does **not** treat `NULL` values as equal. A `NULL` in a join key will never match another `NULL`. |
+
+---
+
+### Practical Example
+
+Let's use two simple tables to illustrate the difference.
+
+`Table_A`
+| id | name  |
+|----|-------|
+| 1  | Alice |
+| 2  | Bob   |
+| 3  | Alice |
+
+`Table_B`
+| id | name  |
+|----|-------|
+| 1  | Alice |
+| 4  | Carol |
+| 5  | Alice |
+
+#### Using `INTERSECT`
+
+`INTERSECT` looks for **identical full rows**.
+
+```sql
+SELECT id, name FROM Table_A
+INTERSECT
+SELECT id, name FROM Table_B;
+```
+
+**Result:**
+
+| id | name  |
+|----|-------|
+| 1  | Alice |
+
+**Why?** The only row that is exactly the same (matching on both `id` and `name`) in both tables is `(1, 'Alice')`.
+
+#### Using `INNER JOIN`
+
+`INNER JOIN` combines rows based on a **join condition**. Let's join on the `name` column.
+
+```sql
+SELECT
+    A.id AS a_id,
+    A.name,
+    B.id AS b_id
+FROM
+    Table_A A
+INNER JOIN
+    Table_B B ON A.name = B.name;
+```
+
+**Result:**
+
+| a_id | name  | b_id |
+|------|-------|------|
+| 1    | Alice | 1    |
+| 1    | Alice | 5    |
+| 3    | Alice | 1    |
+| 3    | Alice | 5    |
+
+**Why?** The join condition is `A.name = B.name`.
+*   `Table_A` has two rows where `name = 'Alice'` (ids 1 and 3).
+*   `Table_B` has two rows where `name = 'Alice'` (ids 1 and 5).
+*   The `INNER JOIN` creates a Cartesian product of these matches (2 rows from A * 2 rows from B = 4 result rows).
+
+### Summary: When to Use Which?
+
+*   Use **`INTERSECT`** when you want to find the **common, identical records** between two similar result sets. Think of it as finding the "overlap" of two lists.
+*   Use **`INNER JOIN`** when you want to **enrich data** by combining columns from two different tables based on a related key. This is the standard and far more common way to bring related data together.
+
+<br></br>
+
+# SQL Views
 
 A `VIEW` in SQL is a virtual table based on the result-set of an SQL statement. A view contains rows and columns, just like a real table. The fields in a view are fields from one or more real tables in the database.
 
@@ -369,7 +489,7 @@ MySQL does not support the `CASCADE` or `RESTRICT` options. You must manually dr
 
 <br></br>
 
-## SQL Indexes
+# SQL Indexes
 
 An SQL index is a special lookup table that the database search engine can use to speed up data retrieval. Think of it like the index in the back of a book; it allows the database to find rows with specific column values much more quickly than scanning the entire table.
 
@@ -381,7 +501,7 @@ While indexes speed up `SELECT` queries and `WHERE` clauses, they can slow down 
 > For all other columns (like foreign keys or columns frequently used in `WHERE`, `JOIN`, `ORDER BY` clauses), you must **manually create indexes** using the `CREATE INDEX` command to improve query performance.
 
 
-### Creating an Index
+## Creating an Index
 
 The basic syntax to create an index is similar in PostgreSQL and MySQL. You specify a name for the index, the table it applies to, and the column(s) to be indexed.
 
@@ -409,7 +529,7 @@ FROM customers
 WHERE customer_name = 'Alice';
 ```
 
-### Showing Indexes
+## Showing Indexes
 
 It's often useful to see what indexes already exist on your tables. The method for doing this differs between PostgreSQL and MySQL.
 
@@ -452,7 +572,7 @@ MySQL provides a `SHOW INDEX` statement.
     WHERE TABLE_SCHEMA = 'your_database_name';
     ```
 
-### Dropping an Index
+## Dropping an Index
 
 To remove an index, you use the `DROP INDEX` statement.
 
@@ -476,11 +596,11 @@ DROP INDEX idx_customers_name ON customers;
 ```
  <br></br>
 
-## Subqueries (Inner Queries or Nested Queries)
+# Subqueries (Inner Queries or Nested Queries)
 
 A subquery is a `SELECT` statement that is nested inside another SQL statement (like `SELECT`, `INSERT`, `UPDATE`, or `DELETE`). The result of the inner query is used by the outer query. Subqueries are always enclosed in parentheses `()`.
 
-### Subqueries in the `WHERE` Clause
+## Subqueries in the `WHERE` Clause
 
 This is the most common use case, allowing you to filter results based on the output of another query.
 
@@ -514,7 +634,7 @@ ON
 ```
 Here, the subquery calculates the total orders for each `customer_id` and creates a temporary table named `order_counts`. The outer query then joins the `customers` table with this derived table to get the customer names.
 
-### Subqueries in the `SELECT` Clause
+## Subqueries in the `SELECT` Clause
 
 A subquery in the `SELECT` clause is used to retrieve a single value (one row, one column) and is known as a scalar subquery. It is executed for each row returned by the outer query.
 

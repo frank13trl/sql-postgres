@@ -309,3 +309,590 @@ The `ABS()` function returns the absolute (non-negative) value of a number.
 SELECT ABS(-123.45); -- Returns 123.45
 SELECT ABS(price_difference) FROM product_price_history;
 ```
+
+## Conditional Functions
+
+Conditional functions allow you to introduce if-else logic into your SQL queries.
+
+### CASE
+
+The `CASE` statement goes through conditions and returns a value when the first condition is met. So, once a condition is true, it will stop reading and return the result. If no conditions are true, it returns the value in the `ELSE` clause. If there is no `ELSE` part and no conditions are true, it returns NULL.
+
+**Example:**
+
+```sql
+SELECT
+    product_name,
+    price,
+    CASE
+        WHEN price > 100 THEN 'Expensive'
+        WHEN price > 50 THEN 'Moderate'
+        ELSE 'Cheap'
+    END AS price_category
+FROM
+    products;
+```
+
+**Output:**
+
+```
+ product_name | price | price_category
+--------------+-------+----------------
+ Product A    |   120 | Expensive
+ Product B    |    80 | Moderate
+ Product C    |    40 | Cheap
+ Product D    |   120 | Expensive
+```
+
+### COALESCE()
+
+The `COALESCE()` function returns the first non-null expression among its arguments. It's often used to provide a default value for columns that might contain `NULL`s.
+
+**Example:**
+
+Assume a `products` table with `product_name`, `description`, and `short_description` columns, where `description` might be `NULL`.
+
+```sql
+SELECT
+    product_name,
+    COALESCE(description, short_description, 'No description available') AS display_description
+FROM
+    products;
+```
+
+**Output (assuming sample data):**
+
+```
+| product_name | display_description        |
+|--------------|----------------------------|
+| Product X    | Full description here      |
+| Product Y    | Short desc Y               |
+| Product Z    | No description available   |
+```
+
+<br></br>
+
+# Window Functions (Advanced)
+
+Window functions perform calculations across a set of table rows that are somehow related to the current row. This is comparable to the type of calculation that can be done with an aggregate function. However, window functions do not cause rows to become grouped into a single output row like non-window aggregate calls do. Instead, the rows retain their separate identities.
+
+### PARTITION BY
+
+The `PARTITION BY` clause is a subclause of the `OVER` clause. It divides the rows into partitions to which the window function is applied. If `PARTITION BY` is not specified, the entire result set is treated as a single partition.
+
+### ROW_NUMBER()
+
+`ROW_NUMBER()` assigns a unique integer to each row within a partition of a result set.
+
+**Example without PARTITION BY:**
+
+```sql
+SELECT
+    product_name,
+    price,
+    ROW_NUMBER() OVER (ORDER BY price DESC) as row_num
+FROM
+    products;
+```
+
+**Output:**
+
+```
+ product_name | price | row_num
+--------------+-------+---------
+ Product A    |   120 |       1
+ Product D    |   120 |       2
+ Product B    |    80 |       3
+ Product C    |    40 |       4
+```
+
+**Example with PARTITION BY:**
+
+```sql
+SELECT
+    product_name,
+    category,
+    price,
+    ROW_NUMBER() OVER (PARTITION BY category ORDER BY price DESC) as row_num
+FROM
+    products;
+```
+
+**Output:**
+
+```
+ product_name |  category  | price | row_num
+--------------+------------+-------+---------
+ Product A    | Category 1 |   120 |       1
+ Product D    | Category 1 |   120 |       2
+ Product E    | Category 1 |   100 |       3
+ Product B    | Category 2 |    80 |       1
+ Product C    | Category 2 |    40 |       2
+```
+
+### RANK()
+
+`RANK()` assigns a rank to each row within a partition of a result set. The rank of a row is one plus the number of ranks that come before the row in question.
+
+**Example without PARTITION BY:**
+
+```sql
+SELECT
+    product_name,
+    price,
+    RANK() OVER (ORDER BY price DESC) as rank
+FROM
+    products;
+```
+
+**Output:**
+
+```
+ product_name | price | rank
+--------------+-------+------
+ Product A    |   120 |    1
+ Product D    |   120 |    1
+ Product B    |    80 |    3
+ Product C    |    40 |    4
+```
+
+**Example with PARTITION BY:**
+
+```sql
+SELECT
+    product_name,
+    category,
+    price,
+    RANK() OVER (PARTITION BY category ORDER BY price DESC) as rank
+FROM
+    products;
+```
+
+**Output:**
+
+```
+ product_name |  category  | price | rank
+--------------+------------+-------+------
+ Product A    | Category 1 |   120 |    1
+ Product D    | Category 1 |   120 |    1
+ Product E    | Category 1 |   100 |    3
+ Product B    | Category 2 |    80 |    1
+ Product C    | Category 2 |    40 |    2
+```
+
+### DENSE_RANK()
+
+`DENSE_RANK()` assigns a rank to each row within a partition of a result set, without any gaps in the ranking. The rank of a row is one plus the number of distinct ranks that come before the row in question.
+
+**Example without PARTITION BY:**
+
+```sql
+SELECT
+    product_name,
+    price,
+    DENSE_RANK() OVER (ORDER BY price DESC) as dense_rank
+FROM
+    products;
+```
+
+**Output:**
+
+```
+ product_name | price | dense_rank
+--------------+-------+------------
+ Product A    |   120 |          1
+ Product D    |   120 |          1
+ Product B    |    80 |          2
+ Product C    |    40 |          3
+```
+
+**Example with PARTITION BY:**
+
+```sql
+SELECT
+    product_name,
+    category,
+    price,
+    DENSE_RANK() OVER (PARTITION BY category ORDER BY price DESC) as dense_rank
+FROM
+    products;
+```
+
+**Output:**
+
+```
+ product_name |  category  | price | dense_rank
+--------------+------------+-------+------------
+ Product A    | Category 1 |   120 |          1
+ Product D    | Category 1 |   120 |          1
+ Product E    | Category 1 |   100 |          2
+ Product B    | Category 2 |    80 |          1
+ Product C    | Category 2 |    40 |          2
+```
+
+### LEAD() and LAG()
+
+`LEAD()` provides access to a row at a given physical offset that follows the current row. `LAG()` provides access to a row at a given physical offset that comes before the current row.
+
+**Example without PARTITION BY:**
+
+```sql
+SELECT
+    product_name,
+    price,
+    LEAD(price, 1) OVER (ORDER BY price) as next_price,
+    LAG(price, 1) OVER (ORDER BY price) as prev_price
+FROM
+    products;
+```
+
+**Output:**
+
+```
+ product_name | price | next_price | prev_price
+--------------+-------+------------+------------
+ Product C    |    40 |         80 |       NULL
+ Product B    |    80 |        120 |         40
+ Product A    |   120 |        120 |         80
+ Product D    |   120 |       NULL |        120
+```
+
+**Example with PARTITION BY:**
+
+```sql
+SELECT
+    product_name,
+    category,
+    price,
+    LEAD(price, 1) OVER (PARTITION BY category ORDER BY price) as next_price,
+    LAG(price, 1) OVER (PARTITION BY category ORDER BY price) as prev_price
+FROM
+    products;
+```
+
+**Output:**
+
+```
+ product_name |  category  | price | next_price | prev_price
+--------------+------------+-------+------------+------------
+ Product E    | Category 1 |   100 |        120 |       NULL
+ Product A    | Category 1 |   120 |        120 |        100
+ Product D    | Category 1 |   120 |       NULL |        120
+ Product C    | Category 2 |    40 |         80 |       NULL
+ Product B    | Category 2 |    80 |       NULL |         40
+```
+
+### NTILE()
+
+`NTILE(n)` is a window function that distributes the rows in an ordered partition into a specified number of ranked groups (`n`). For each row, `NTILE()` returns the group number (from 1 to `n`) to which the row belongs.
+
+**Example without PARTITION BY:**
+
+This example divides the products into two groups based on price.
+
+```sql
+SELECT
+    product_name,
+    price,
+    NTILE(2) OVER (ORDER BY price) as price_tile
+FROM
+    products;
+```
+
+**Output:**
+
+```
+ product_name | price | price_tile
+--------------+-------+------------
+ Product C    |    40 |          1
+ Product B    |    80 |          1
+ Product E    |   100 |          1
+ Product A    |   120 |          2
+ Product D    |   120 |          2
+```
+
+**Example with PARTITION BY:**
+
+This example divides the products within each category into two groups.
+
+```sql
+SELECT
+    product_name,
+    category,
+    price,
+    NTILE(2) OVER (PARTITION BY category ORDER BY price) as price_tile
+FROM
+    products;
+```
+
+**Output:**
+
+```
+ product_name |  category  | price | price_tile
+--------------+------------+-------+------------
+ Product E    | Category 1 |   100 |          1
+ Product A    | Category 1 |   120 |          1
+ Product D    | Category 1 |   120 |          2
+ Product C    | Category 2 |    40 |          1
+ Product B    | Category 2 |    80 |          2
+ ```
+ 
+ ### FIRST_VALUE() and LAST_VALUE()
+ 
+ `FIRST_VALUE()` returns the value of an expression from the first row of the window frame.
+ `LAST_VALUE()` returns the value of an expression from the last row of the window frame.
+ 
+ A critical concept for these functions is the **window frame**. By default, the frame for an `ORDER BY` clause is `RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW`. This means `FIRST_VALUE()` works as expected (it sees the first row of the partition), but `LAST_VALUE()` will only see up to the *current* row, which is often not the desired behavior.
+ 
+ To make `LAST_VALUE()` consider all rows in the partition, you must explicitly define the window frame as `ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING`.
+ 
+ **Example:**
+ 
+ This example finds the cheapest and most expensive product within each category.
+ 
+ ```sql
+ SELECT
+     category,
+     product_name,
+     price,
+     FIRST_VALUE(product_name) OVER (PARTITION BY category ORDER BY price) as cheapest_in_cat,
+     LAST_VALUE(product_name) OVER (
+         PARTITION BY category ORDER BY price
+         ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
+     ) as most_expensive_in_cat
+ FROM
+     products;
+ ```
+ 
+ **Output:**
+ 
+ ```
+   category  | product_name | price | cheapest_in_cat | most_expensive_in_cat
+ ------------+--------------+-------+-----------------+-----------------------
+  Category 1 | Product E    |   100 | Product E       | Product D
+  Category 1 | Product A    |   120 | Product E       | Product D
+  Category 1 | Product D    |   120 | Product E       | Product D
+  Category 2 | Product C    |    40 | Product C       | Product B
+  Category 2 | Product B    |    80 | Product C       | Product B
+ ```
+
+## Common Table Expressions (CTE)
+
+A Common Table Expression (CTE) is a temporary named result set that you can reference within a `SELECT`, `INSERT`, `UPDATE`, or `DELETE` statement. CTEs are defined using the `WITH` clause and help improve the readability and structure of complex queries.
+
+### CTE vs. Views
+
+| Feature | Common Table Expression (CTE) | View |
+| :--- | :--- | :--- |
+| **Lifecycle** | Exists only for the duration of a single query. | A persistent database object that remains until dropped. |
+| **Storage** | Not stored in the database schema. Defined at the start of a query. | Stored in the database as a query definition. |
+| **Usage** | Ideal for simplifying a specific, complex query. | Ideal for providing a reusable, secure, or simplified interface to tables for many different queries. |
+| **Recursion** | Can be recursive, which is essential for hierarchical data queries. | Standard views cannot be recursive. |
+
+### Non-Recursive CTE
+
+This is the most common type of CTE. It acts like a temporary view that exists only for the duration of a single query.
+
+**Benefits:**
+- **Readability:** Breaks down complex queries into simple, logical building blocks.
+- **Maintainability:** Makes it easier to understand and modify complex logic.
+- **Reusability:** A CTE can be referenced multiple times within the main query.
+
+**Example:**
+
+This query first defines a CTE named `RegionalCustomers` to select customers from a specific region, and then the main query selects from that CTE.
+
+```sql
+WITH RegionalCustomers AS (
+    SELECT customer_id, customer_name
+    FROM customers
+    WHERE region = 'North America'
+)
+
+-- RegionalCustomer is now CTE
+SELECT *
+FROM RegionalCustomers;
+
+-- OR any query
+SELECT COUNT(*) FROM RegionalCustomers;
+```
+
+**Example with Multiple CTEs:**
+
+You can define multiple CTEs within a single `WITH` clause, separating them with commas. Subsequent CTEs can reference previously defined CTEs within the same `WITH` clause.
+
+This example uses two CTEs: `ExpensiveProducts` and `Category1Products`, and then joins them to find products that are both expensive and belong to 'Category 1'.
+
+```sql
+WITH ExpensiveProducts AS (
+    SELECT product_name, category, price
+    FROM products
+    WHERE price > 100
+),
+Category1Products AS (
+    SELECT product_name, category, price
+    FROM products
+    WHERE category = 'Category 1'
+)
+SELECT
+    ep.product_name,
+    ep.category,
+    ep.price
+FROM
+    ExpensiveProducts ep
+JOIN
+    Category1Products c1p ON ep.product_name = c1p.product_name;
+```
+
+**Output:**
+
+```
+ product_name |  category  | price
+--------------+------------+-------
+ Product A    | Category 1 |   120
+ Product D    | Category 1 |   120
+```
+
+### Recursive CTE (Optional)
+
+A recursive CTE is one that references itself. It consists of an "anchor" member (the initial query) and a "recursive" member that references the CTE's own name, combined with a `UNION ALL`. A termination condition in the recursive member's `WHERE` clause is crucial to prevent infinite loops.
+
+**Use Cases:**
+- Querying hierarchical data (e.g., organizational charts, bill of materials).
+- Generating series or sequences.
+
+**Example:**
+
+This recursive CTE generates a sequence of numbers from 1 to 5.
+
+```sql
+-- The RECURSIVE keyword is required in PostgreSQL, but optional in some other dialects like SQL Server.
+WITH RECURSIVE NumberSequence AS (
+    -- Anchor member: the starting point of the recursion
+    SELECT 1 AS n
+
+    UNION ALL
+
+    -- Recursive member: references the CTE itself
+    SELECT n + 1
+    FROM NumberSequence
+    WHERE n < 5 -- Termination condition
+)
+-- Main query to select from the CTE
+SELECT n
+FROM NumberSequence;
+```
+
+**Output:**
+
+```
+ n
+---
+ 1
+ 2
+ 3
+ 4
+ 5
+```
+
+## Data Transformation: Pivoting and Unpivoting
+
+Pivoting and unpivoting are powerful SQL techniques for transforming the structure of your data, often used for reporting and analysis.
+
+### Pivoting
+
+**Pivoting** transforms data from a row-level format to a columnar format. It rotates unique values from one column into multiple new columns. Think of it as turning a "tall" table into a "wide" table.
+
+**Example:**
+
+Imagine you have a "tall" table of product sales by month:
+
+**Before Pivoting:**
+| product | month | sales |
+|---------|-------|-------|
+| Laptop  | Jan   | 1000  |
+| Laptop  | Feb   | 1500  |
+| Mouse   | Jan   | 200   |
+| Mouse   | Feb   | 300   |
+
+You want to pivot this data so that each month becomes its own column.
+
+**After Pivoting:**
+| product | Jan_Sales | Feb_Sales |
+|---------|-----------|-----------|
+| Laptop  | 1000      | 1500      |
+| Mouse   | 200       | 300       |
+
+**How it's done (Standard SQL Technique):**
+The most common and portable way to pivot data, which works in virtually all SQL databases, is to use an aggregate function (like `SUM` or `MAX`) with a `CASE` statement.
+
+```sql
+SELECT
+    product,
+    SUM(CASE WHEN month = 'Jan' THEN sales ELSE 0 END) AS Jan_Sales,
+    SUM(CASE WHEN month = 'Feb' THEN sales ELSE 0 END) AS Feb_Sales
+FROM
+    sales_data
+GROUP BY
+    product;
+```
+*   **Database-Specific `PIVOT` Operator:** Some databases (like SQL Server, Oracle, DB2) have a dedicated `PIVOT` operator that can simplify this syntax. However, the `CASE` statement method is more universal.
+*   **PostgreSQL Specific (`FILTER` clause):** PostgreSQL offers a `FILTER` clause for aggregate functions, which can sometimes make the pivoting syntax cleaner than `CASE`:
+    ```sql
+    SELECT
+        product,
+        SUM(sales) FILTER (WHERE month = 'Jan') AS Jan_Sales,
+        SUM(sales) FILTER (WHERE month = 'Feb') AS Feb_Sales
+    FROM
+        sales_data
+    GROUP BY
+        product;
+    ```
+
+### Unpivoting
+
+**Unpivoting** is the reverse operation. It transforms data from a columnar format back into a row-level format. It rotates columns into rows. Think of it as turning a "wide" table back into a "tall" table.
+
+**Example:**
+
+Using the "wide" table from before:
+
+**Before Unpivoting:**
+| product | Jan_Sales | Feb_Sales |
+|---------|-----------|-----------|
+| Laptop  | 1000      | 1500  |
+| Mouse   | 200       | 300   |
+
+You want to unpivot this data to have a single column for the month and a single column for sales.
+
+**After Unpivoting:**
+| product | month | sales |
+|---------|-------|-------|
+| Laptop  | Jan   | 1000  |
+| Laptop  | Feb   | 1500  |
+| Mouse   | Jan   | 200   |
+| Mouse   | Feb   | 300   |
+
+**How it's done (Standard SQL Techniques):**
+
+*   **`UNION ALL` (Universal):** This is the most common and portable way to unpivot. You use `UNION ALL` to combine multiple `SELECT` statements, each selecting one of the columns you want to turn into a row and assigning it to a common "value" column, while also creating a "key" column to identify the original column name.
+
+    ```sql
+    SELECT product, 'Jan' AS month, Jan_Sales AS sales FROM pivoted_sales
+    UNION ALL
+    SELECT product, 'Feb' AS month, Feb_Sales AS sales FROM pivoted_sales;
+    ```
+
+*   **`CROSS JOIN LATERAL` with `VALUES` (PostgreSQL, Oracle, some others):** This is a more advanced and often more flexible method, especially when dealing with many columns or dynamic unpivoting.
+
+    ```sql
+    SELECT p.product, v.month, v.sales
+    FROM pivoted_sales p
+    CROSS JOIN LATERAL (
+        VALUES
+        ('Jan', p.Jan_Sales),
+        ('Feb', p.Feb_Sales)
+    ) AS v (month, sales);
+    ```
+*   **Database-Specific `UNPIVOT` Operator:** Some databases (like SQL Server, Oracle, DB2) provide an `UNPIVOT` operator for this purpose.
+
